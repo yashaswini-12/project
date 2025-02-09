@@ -1,0 +1,494 @@
+#include <ThingSpeak.h> 
+#include <WiFi.h> 
+char ssid[]="Kamal"; 
+char password[]="AK1234567890"; 
+unsigned long Channel_ID=  2589128; 
+const char * write_api_key="mwa0000032957908"; 
+WiFiClient client; 
+int field1=1, field2=2, field3=3, field4=4, field5=5, field6=6, field7=7, field8=8, field9=9, 
+f
+ ield10=10; 
+//Include the library 
+#include <MQUnifiedsensor.h> 
+#include <MQSpaceData.h> 
+#include <Wire.h> 
+#include <Adafruit_GFX.h> 
+#include <Adafruit_SSD1306.h> 
+#include <stdlib.h> 
+#define SCREEN_WIDTH 128  
+#define SCREEN_HEIGHT 64 
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1); 
+//Definitions 
+#define placa "ESP-32" 
+#define Voltage_Resolution 5 
+#define pin A0 //Analog input 0 of your arduino 
+#define type "MQ-135" //MQ135 
+#define ADC_Bit_Resolution 10 // For arduino UNO/MEGA/NANO 
+#define RatioMQ135CleanAir 3.6//RS / R0 = 3.6 ppm  
+//#define calibration_button 13 //Pin to calibrate your sensor 
+//Declare Sensor 
+MQUnifiedsensor MQ135(placa, Voltage_Resolution, ADC_Bit_Resolution, pin, type); 
+#define Rload             
+10 //Rload value for soldered models is 10 
+#define ADC_BIT_RESU      (10) 
+#define space7            
+(A3) 
+#define space2            
+#define         
+(A4) 
+MQ2Pin    34  //Analog input 3 of your ar 
+#define         
+Type                    
+("MQ-2") //MQ2 
+#define         Voltage_Resolution      (5)  
+ 
+#define         ADC_Bit_Resolution      (10) // For arduino UNO/MEGA/NANO 
+#define         RatioMQ2CleanAir        (9.83) //RS / R0 = 9.83 ppm  
+MQUnifiedsensor MQ2(placa, Voltage_Resolution, ADC_Bit_Resolution, MQ2Pin, Type); 
+ 
+#define Voltage_Resolution 5 
+#define MQ7pin  35  //Analog input 0 of your arduino 
+#define type "MQ-7" //MQ7 
+#define ADC_Bit_Resolution (10) // For arduino UNO/MEGA/NANO 
+#define RatioMQ7CleanAir (27.5) //RS / R0 = 27.5 ppm  
+ 
+MQUnifiedsensor MQ7(placa, Voltage_Resolution, ADC_Bit_Resolution, pin, type); 
+ 
+void setup()  
+{ 
+  pinMode(18, OUTPUT);             
+  pinMode(17, OUTPUT); 
+  pinMode(16, OUTPUT); 
+  Serial.begin(115200); 
+  
+  if(!display. begin (SSD1306_SWITCHCAPVCC, 0x3C)) {   
+    Serial.println(("SSD1606 allocation failed")); 
+    for(;;); 
+  } 
+ 
+  display.display(); // Clear the display 
+  delay(2000); 
+ 
+  Serial.begin(9600); //Init serial port 
+ 
+  MQ135.setRegressionMethod(1); //_PPM =  a*ratio^b 
+   
+  MQ135.init();  
+   
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(1); 
+  display.setTextColor (WHITE);  
+  display.setCursor(0, 20); 
+  Serial.print("Calibrating please wait."); 
+  display.print("Calibrating please wait.\n"); 
+  display.display(); 
+   
+  float calcR0 = 0; 
+  for(int i = 1; i<=10; i ++) 
+  { 
+    MQ135.update(); // Update data, the arduino will read the voltage from the analog pin 
+    calcR0 += MQ135.calibrate(RatioMQ135CleanAir); 
+    delay (200); 
+    display.print("."); 
+    display.display(); 
+  } 
+  delay (200); 
+  MQ135.setR0(calcR0/10); 
+  display.println("  \n done!."); 
+  display.display(); 
+   
+  if(isinf(calcR0)) {Serial.println("Warning: Conection issue, R0 is infinite (Open circuit 
+detected) please check your wiring and supply"); while(1);} 
+  if(calcR0 == 0){Serial.println("Warning: Conection issue found, R0 is zero (Analog pin 
+shorts to ground) please check your wiring and supply"); while(1);} 
+  /*****************************  MQ CAlibration 
+********************************************/  
+  delay (2000); 
+   
+  Serial.println("** Values from MQ-135 ****"); 
+  Serial.println("|    CO   |  Alcohol |   CO2  |  Toluen  |  NH4  |  Aceton  |"); 
+  display.clearDisplay(); 
+ 
+  WiFi.begin(ssid,password); 
+  while(WiFi.status()!=WL_CONNECTED) 
+  { 
+    delay(500); 
+    display.print("Connecting to...");Serial.println(ssid); 
+  } 
+  display.println("Connected"); 
+  Serial.println(WiFi.localIP()); 
+  ThingSpeak.begin(client); 
+   
+  delay (2000); 
+  display.setCursor(0, 30); 
+  display.println("   ** GASESS ARE**"); 
+  display.display();  
+ 
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setCursor(0, 10); 
+  display.println("\n (1)CO  (2)Alcohol \n(3)CO2 (4)Toluen \n(5)NH4  (6)Aceton 
+\n(7)H2  (8)LPG \n(9)CH4  (10)Propane   ");   
+  display.display();  
+   
+} 
+ 
+void loop() { 
+  MQ135.update(); // Update data, the arduino will read the voltage from the analog pin 
+ 
+  MQ135.setA(605.18); MQ135.setB(-3.937); // Configure the equation to calculate CO 
+concentration value 
+  float CO = MQ135.readSensor(); // Sensor will read PPM concentration using the 
+model, a and b values set previously or from the setup 
+ 
+  MQ135.setA(77.255); MQ135.setB(-3.18); //Configure the equation to calculate 
+Alcohol concentration value 
+  float Alcohol = MQ135.readSensor(); // SSensor will read PPM concentration using the 
+model, a and b values set previously or from the setup 
+ 
+  MQ135.setA(110.47); MQ135.setB(-2.862); // Configure the equation to calculate CO2 
+concentration value 
+  float CO2 = MQ135.readSensor(); // Sensor will read PPM concentration using the 
+model, a and b values set previously or from the setup 
+ 
+  MQ135.setA(44.947); MQ135.setB(-3.445); // Configure the equation to calculate 
+Toluen concentration value 
+  float Toluen = MQ135.readSensor(); // Sensor will read PPM concentration using the 
+model, a and b values set previously or from the setup 
+   
+  MQ135.setA(102.2 ); MQ135.setB(-2.473); // Configure the equation to calculate NH4 
+concentration value 
+  float NH4 = MQ135.readSensor(); // Sensor will read PPM concentration using the 
+model, a and b values set previously or from the setup 
+ 
+  MQ135.setA(34.668); MQ135.setB(-3.369); // Configure the equation to calculate 
+Aceton concentration value 
+  float Aceton = MQ135.readSensor(); // Sensor will read PPM concentration using the 
+model, a and b values set previously or from the setup 
+ 
+  MQ7.setA(69.014); MQ7.setB(-1.374);  
+  float H2 = MQ7.readSensor();   
+   
+  MQ7.setA(700000000); MQ7.setB(-7.703);  
+  float LPG = MQ7.readSensor();  
+   
+  MQ7.setA(60000000000000); MQ7.setB(-10.54); 
+  float CH4 = MQ7.readSensor();   
+ 
+  MQ2.setA(658.71);  MQ2.setB(-2.168); 
+  float Propane = MQ2.readSensor();  
+   
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE);  
+  display.setCursor(01, 10); 
+  display.print("  01  "); 
+  display.setCursor(02, 30); 
+  display.print("CO  ="); display.print(CO); 
+   
+  if(CO >= 1001) 
+  { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW); delay(1000); 
+  }  
+   
+  if(CO>= 51 && CO <= 100)  
+  {digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH);delay(1000); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW); 
+    } 
+   
+  display.display(); 
+ 
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE);  
+  display.setCursor(01, 10); 
+  display.print("  02  "); 
+  display.setCursor(2, 30); 
+  display.print("CO2  =");display.print(CO2 + 400);  
+ 
+  if(CO2 >= 2000) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(CO2 >= 1000 && CO2 <= 2000)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   
+  display.display(); 
+   
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  03  ");  
+  display.setCursor(2, 30);  
+  display.print("Alcohol  ="); display.print(Alcohol); 
+  if(Alcohol >= 25000) 
+  { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  }  
+  if(Alcohol >= 10000 && Alcohol <= 30000)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+  display.display(); 
+   
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  04  ");  
+  display.setCursor(2, 30); 
+  display.print("Toluene  =");display.print(Toluen);   
+ 
+  if(Toluen >= 300) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(Toluen >= 51 && Toluen <= 200)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   display.display(); 
+   
+  
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  05  ");  
+  display.setCursor(2,30); 
+  display.print("NH4 =");display.print(NH4);  
+   
+ 
+  if(NH4 >= 51) 
+    { 
+       
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(NH4 >= 26 && NH4  <= 50)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+  display.display(); 
+ 
+   
+   
+   
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  06  ");  
+  display.setCursor(2, 30); 
+  display.print("Aceton =");display.print(Aceton); 
+ 
+  if(Aceton >= 500) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(Aceton >= 251 && Aceton <= 500)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   
+  display.display(); 
+ 
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  07  ");  
+  display.setCursor(2, 30); 
+  display.print("H2 =");display.println(H2); 
+ 
+  if(H2 >= 5000) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(H2 >= 1000 && H2 <= 5000)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   
+  display.display(); 
+ 
+  delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  08  "); 
+  display.setCursor(2, 30); 
+  display.print("LPG  =");display.println(LPG); 
+ 
+  if(LPG >= 25000) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(LPG >= 10000 && LPG <= 25000)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   
+  display.display(); 
+ 
+   delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  09  ");  
+  display.setCursor(2, 30); 
+  display.print("CH4 =");display.println(CH4); 
+ 
+  if(CH4 >= 5000) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }  
+  if(CH4 >= 1001 && CH4 <= 5000)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   
+  display.display(); 
+ 
+   delay (2000); 
+  display.clearDisplay(); 
+  display.setTextSize(2); 
+  display.setTextColor (WHITE); 
+  display.setCursor(01, 10); 
+  display.print("  10  ");  
+  display.setCursor(2, 30); 
+  display.print("Propane =");display.println(Propane); 
+ 
+  if(Propane >= 15000) 
+    { 
+    digitalWrite(18,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+    }    
+  if(Propane >= 5001 && Propane <= 15000)  
+  { digitalWrite(17,HIGH); 
+    digitalWrite(18,LOW); 
+    digitalWrite(16,LOW);delay(1000); 
+  } 
+  else 
+  { 
+    digitalWrite(16,HIGH); 
+    digitalWrite(17,LOW); 
+    digitalWrite(18,LOW);delay(1000); 
+    } 
+   
+  display.display(); 
+ 
+delay(500); //Sampling frequency 
+  ThingSpeak.setField(1, CO); 
+  ThingSpeak.setField(2, CO2); 
+  ThingSpeak.setField(3, Alcohol); 
+  ThingSpeak.setField(4, Toluen); 
+  ThingSpeak.setField(5, NH4); 
+  ThingSpeak.setField(6, Aceton); 
+  ThingSpeak.setField(7, H2); 
+  ThingSpeak.setField(8, LPG); 
+  ThingSpeak.setField(9, CH4); 
+  ThingSpeak.setField(10, Propane); 
+ int x = ThingSpeak.writeFields(Channel_ID, write_api_key); 
+  if(x == 200){ 
+    display.println("Channel update successful."); 
+  } 
+  else{ 
+    display.println("Problem updating channel. HTTP error code " + String(x)); 
+  } 
+delay(500); //Sampling frequency 
+}

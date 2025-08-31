@@ -1,0 +1,23 @@
+import torch
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+
+# Load pre-trained model and tokenizer
+model = AutoModelForSeq2SeqLM.from_pretrained("t5-small")
+tokenizer = AutoTokenizer.from_pretrained("t5-small")
+
+def generate_response(user_input):
+    # Tokenize user input
+    inputs = tokenizer(user_input, return_tensors="pt")
+
+    # Generate response
+    outputs = model.generate(**inputs, max_length=100)
+
+    # Decode response
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+    return response
+
+# Test the chatbot
+user_input = input("User: ")
+response = generate_response(user_input)
+print("Chatbot:", response)

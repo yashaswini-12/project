@@ -1,0 +1,31 @@
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+# Load pre-trained model and tokenizer
+model_name = "distilbert-base-uncased-finetuned-sst-2-english"
+model = AutoModelForSequenceClassification.from_pretrained(model_name)
+tokenizer = AutoTokenizer.from_pretrained(model_name)
+
+def analyze_sentiment(text):
+    # Tokenize text
+    inputs = tokenizer(text, return_tensors="pt")
+
+    # Get sentiment scores
+    outputs = model(**inputs)
+    sentiment_scores = outputs.logits
+
+    # Determine sentiment
+    sentiment = torch.argmax(sentiment_scores)
+
+    # Map sentiment to label
+    if sentiment == 0:
+        label = "Negative"
+    else:
+        label = "Positive"
+
+    return label
+
+# Test the function
+text = "I love this product!"
+sentiment = analyze_sentiment(text)
+print(f"Sentiment: {sentiment}")
